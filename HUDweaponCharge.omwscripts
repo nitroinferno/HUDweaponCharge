@@ -1,0 +1,3 @@
+MENU: Scripts/HUDWeaponCharge/menu.lua
+PLAYER: Scripts/HUDWeaponCharge/settings.lua
+PLAYER: Scripts/HUDWeaponCharge/weaponCharge_p.lua
