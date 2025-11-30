@@ -112,6 +112,11 @@ local accumulator = 0
 
 -- UPDATE FUNCTION
 fns.updateChargeBar = function()
+    if not I.UI.isHudVisible() then
+        barRoot.layout.content = ui.content({})
+        barRoot:update()
+        return
+    end
     local weapon = fns.getCurrentWeapon()
 
     local rec, itemData = nil, nil
