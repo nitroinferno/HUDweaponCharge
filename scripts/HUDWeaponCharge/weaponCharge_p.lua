@@ -12,7 +12,7 @@ local async   = require('openmw.async')
 -- Load user settings
 local userInterfaceSettings = storage.playerSection("SettingsPlayer" .. modInfo.name)
 local colorSetting = userInterfaceSettings:get("colorSetting")
-
+local betterBar = userInterfaceSettings:get("betterBarSetting")
 
 
 -- Local variables & Defaults
@@ -26,7 +26,10 @@ local displayAreaY = ui.layers[1].size.y
 local defaults = {xPos = 82, yPos = displayAreaY-12}
 local DataBarHeight = 7
 local UPDATE_INTERVAL = 1        -- update every 1 seconds
-
+-- Adjust for Better Bar mod
+if betterBar then
+    defaults.xPos = 52
+end
 -- Getter for current right slot
 fns.getCurrentWeapon = function() return Actor.equipment(self)[SLOT_CARRIED_RIGHT] end
 -- Small Progress Bar Creator
@@ -71,20 +74,7 @@ fns.createSmallProgressBar = function(width, height, color, percent, opacity)
     }
 end
 
--- Subscribe to color setting
-userInterfaceSettings:subscribe(async:callback(function(section, key)
-    if key then
-        if key == "colorSetting" then
-            colorSetting = userInterfaceSettings:get(key)
-            fns.updateChargeBar()
-        end
-    else
-        --do nothing..
-    end
-end))
---------------------------------------------------------------------
--- ROOT UI ELEMENT (center screen)
---------------------------------------------------------------------
+-- ROOT UI ELEMENT
 local barRoot = ui.create {
     layer = "HUD",
     name  = "ChargeBarHUD",
@@ -96,6 +86,27 @@ local barRoot = ui.create {
     },
     content = ui.content {},
 }
+-- Subscribe to color setting
+userInterfaceSettings:subscribe(async:callback(function(section, key)
+    if key then
+        if key == "colorSetting" then
+            colorSetting = userInterfaceSettings:get(key)
+            fns.updateChargeBar()
+        elseif key == "betterBarSetting" then
+            betterBar = userInterfaceSettings:get(key)
+            if betterBar then
+                defaults.xPos = 52
+            else
+                defaults.xPos = 82
+            end
+            barRoot.layout.props.position = v2(defaults.xPos, defaults.yPos)
+            fns.updateChargeBar()
+        end
+    else
+        --do nothing..
+    end
+end))
+
 -- UPDATE TIMER
 local accumulator = 0
 

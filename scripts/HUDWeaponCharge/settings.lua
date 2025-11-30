@@ -42,6 +42,7 @@ I.Settings.registerGroup {
 	settings = {
 		setting("modEnable", "checkbox", {}, "Enable Mod", modEnableDescription, true),
 		setting("colorSetting", "color2", {}, "colorPicker", "color picker widget", util.color.hex(ChargeColor:asHex())),
+		setting("betterBarSetting", "checkbox", {}, "Better Bar Compatibility", "Enable if using BetterBars mod", false),
 	}
 }
 
