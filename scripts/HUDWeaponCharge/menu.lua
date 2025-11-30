@@ -1,7 +1,7 @@
 local I = require('openmw.interfaces')
 local ui = require('openmw.ui')
 local util = require('openmw.util')
-local colorPicker = require('scripts.omw.settings.colorPicker')
+local colorPicker = require('scripts.HUDweaponCharge.colorPicker')
 local input = require('openmw.input')
 local async = require('openmw.async')
 
