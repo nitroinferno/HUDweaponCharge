@@ -28,7 +28,7 @@ local DataBarHeight = 7
 local UPDATE_INTERVAL = 1        -- update every 1 seconds
 -- Adjust for Better Bar mod
 if betterBar then
-    defaults.xPos = 52
+    defaults.xPos = 12
 end
 -- Getter for current right slot
 fns.getCurrentWeapon = function() return Actor.equipment(self)[SLOT_CARRIED_RIGHT] end
@@ -95,7 +95,7 @@ userInterfaceSettings:subscribe(async:callback(function(section, key)
         elseif key == "betterBarSetting" then
             betterBar = userInterfaceSettings:get(key)
             if betterBar then
-                defaults.xPos = 52
+                defaults.xPos = 12
             else
                 defaults.xPos = 82
             end
