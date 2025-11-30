@@ -13,16 +13,7 @@ local async   = require('openmw.async')
 local userInterfaceSettings = storage.playerSection("SettingsPlayer" .. modInfo.name)
 local colorSetting = userInterfaceSettings:get("colorSetting")
 
--- Set the scale of the icons by checking for changes in the UI settings. 
-userInterfaceSettings:subscribe(async:callback(function(section, key)
-    if key then
-        if key == "colorSetting" then
-            colorSetting = userInterfaceSettings:get(key)
-        end
-    else
-        --do nothing..
-    end
-end))
+
 
 -- Local variables & Defaults
 local v2 = util.vector2
@@ -80,6 +71,17 @@ fns.createSmallProgressBar = function(width, height, color, percent, opacity)
     }
 end
 
+-- Subscribe to color setting
+userInterfaceSettings:subscribe(async:callback(function(section, key)
+    if key then
+        if key == "colorSetting" then
+            colorSetting = userInterfaceSettings:get(key)
+            fns.updateChargeBar()
+        end
+    else
+        --do nothing..
+    end
+end))
 --------------------------------------------------------------------
 -- ROOT UI ELEMENT (center screen)
 --------------------------------------------------------------------
