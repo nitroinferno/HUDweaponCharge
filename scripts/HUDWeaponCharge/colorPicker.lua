@@ -889,8 +889,6 @@ local function makeColorPickerBox(value, set)
                     return
                 end
             end),
-            mousePress = async:callback(function(e) print(e.offset, e.position) end),
-            mouseMove = async:callback(function(e) print(e.offset, e.position) end)
         },
     }
 

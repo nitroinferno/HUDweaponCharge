@@ -8,11 +8,16 @@ local I       = require("openmw.interfaces")
 local modInfo = require("Scripts.HUDweaponCharge.modInfo")
 local storage = require("openmw.storage")
 local async   = require('openmw.async')
+local v2 = util.vector2
+local saveData = {}
 
 -- Load user settings
 local userInterfaceSettings = storage.playerSection("SettingsPlayer" .. modInfo.name)
+local positionSettings = storage.playerSection("SettingsPlayer" .. modInfo.name .. "Position")
 local colorSetting = userInterfaceSettings:get("colorSetting")
 local betterBar = userInterfaceSettings:get("betterBarSetting")
+local persist = userInterfaceSettings:get("alwaysOn")
+local HUD_LOCK = positionSettings:get("HUD_LOCK")
 
 
 -- Local variables & Defaults
@@ -20,20 +25,34 @@ local v2 = util.vector2
 local Actor = types.Actor
 local Item = types.Item
 local SLOT_CARRIED_RIGHT = Actor.EQUIPMENT_SLOT.CarriedRight
-local fns = {}
 local iconSize = 30
 local displayAreaY = ui.layers[1].size.y
 local defaults = {xPos = 82, yPos = displayAreaY-12}
 local DataBarHeight = 7
-local UPDATE_INTERVAL = 1        -- update every 1 seconds
+local UPDATE_INTERVAL = 0.15        -- update every 1 seconds
+
+local xPos = (positionSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(positionSettings:get("xPos"))
+local yPos = (positionSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(positionSettings:get("yPos"))
 -- Adjust for Better Bar mod
 if betterBar then
     defaults.xPos = 12
+    yPos = 12
 end
+
+local function setCoord(v2)
+    positionSettings:set("xPos",math.floor(v2.x))
+    positionSettings:set("yPos",math.floor(v2.y))
+end
+
+local function setPosVars()
+    xPos = (positionSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(positionSettings:get("xPos"))
+    yPos = (positionSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(positionSettings:get("yPos"))
+end
+
 -- Getter for current right slot
-fns.getCurrentWeapon = function() return Actor.equipment(self)[SLOT_CARRIED_RIGHT] end
+local function getCurrentWeapon() return Actor.equipment(self)[SLOT_CARRIED_RIGHT] end
 -- Small Progress Bar Creator
-fns.createSmallProgressBar = function(width, height, color, percent, opacity)
+local function createSmallProgressBar(width, height, color, percent, opacity)
     local p = percent and math.max(0, math.min(1, percent)) or 1
     return {
         template = I.MWUI.templates.boxSolid,
@@ -74,50 +93,60 @@ fns.createSmallProgressBar = function(width, height, color, percent, opacity)
     }
 end
 
+local function setupMouseEvents(element)
+    element.layout.events = {
+        mousePress = async:callback(function(coord, layout)
+            if HUD_LOCK then return end
+            layout.userData.doDrag = true
+            layout.userData.lastMousePos = coord.position
+            print(xPos, yPos)
+            
+        end),
+        mouseRelease = async:callback(function(_, layout)
+            if HUD_LOCK then return end
+            local props = layout.props
+            layout.userData.doDrag = false
+            setCoord(props.position)
+            saveData.xPos = props.position.x
+            saveData.yPos = props.position.y
+        end),
+        mouseMove = async:callback(function(coord, layout)
+            if HUD_LOCK then return end
+            if not layout.userData.doDrag then return end
+            local props = layout.props
+            props.position = props.position - (layout.userData.lastMousePos - coord.position)
+            element:update()
+            layout.userData.lastMousePos = coord.position
+        end),
+    }
+end
+
 -- ROOT UI ELEMENT
 local barRoot = ui.create {
-    layer = "HUD",
+    layer = HUD_LOCK and "HUD" or "Modal",
     name  = "ChargeBarHUD",
     props = {
         anchor = v2(0, 0),
         --relativePosition = v2(0.0647, 0.984),
-        position = v2(defaults.xPos, defaults.yPos),      -- adjust horizontal centering if needed
+        position = v2(xPos or defaults.xPos, yPos or defaults.yPos),      -- adjust horizontal centering if needed
         size = v2(iconSize*1.2, DataBarHeight),
     },
     content = ui.content {},
+    events = {},
+    userData = {doDrag = false, lastMousePos = nil},
 }
--- Subscribe to color setting
-userInterfaceSettings:subscribe(async:callback(function(section, key)
-    if key then
-        if key == "colorSetting" then
-            colorSetting = userInterfaceSettings:get(key)
-            fns.updateChargeBar()
-        elseif key == "betterBarSetting" then
-            betterBar = userInterfaceSettings:get(key)
-            if betterBar then
-                defaults.xPos = 12
-            else
-                defaults.xPos = 82
-            end
-            barRoot.layout.props.position = v2(defaults.xPos, defaults.yPos)
-            fns.updateChargeBar()
-        end
-    else
-        --do nothing..
-    end
-end))
-
+setupMouseEvents(barRoot)
 -- UPDATE TIMER
 local accumulator = 0
 
 -- UPDATE FUNCTION
-fns.updateChargeBar = function()
+local function updateChargeBar()
     if not I.UI.isHudVisible() then
         barRoot.layout.content = ui.content({})
         barRoot:update()
         return
     end
-    local weapon = fns.getCurrentWeapon()
+    local weapon = getCurrentWeapon()
 
     local rec, itemData = nil, nil
     if weapon then
@@ -125,35 +154,122 @@ fns.updateChargeBar = function()
         itemData = Item.itemData(weapon)
     end
 
-    if not weapon then
+    if not weapon and not persist then
         barRoot.layout.content = ui.content({})
         barRoot:update()
         return
     end
-    if not rec or not rec.enchant then
-        barRoot.layout.content = ui.content({})
-        barRoot:update()
-        return
+    -- if not rec or not rec.enchant then
+    --     barRoot.layout.content = ui.content({})
+    --     barRoot:update()
+    --     return
+    -- end
+    local ench = rec and rec.enchant and core.magic.enchantments.records[rec.enchant]
+    local pct, bar -- initialized as nil, if applies is false, then content in bar(content) is nil
+    if not ench and persist then
+		bar = createSmallProgressBar(iconSize*1.2, DataBarHeight, colorSetting, 0, 1.0)
+	elseif ench and persist then
+		pct = (itemData and math.floor(itemData.enchantmentCharge) or 0) / ench.charge
+		bar = createSmallProgressBar(iconSize*1.2, DataBarHeight, colorSetting, pct, 1.0)
+    elseif ench and not persist then
+        local applies = (ench.type == core.magic.ENCHANTMENT_TYPE.CastOnStrike) or (ench.type == core.magic.ENCHANTMENT_TYPE.CastOnUse)
+        if applies then
+            pct = (itemData and math.floor(itemData.enchantmentCharge) or 0) / ench.charge
+            bar = createSmallProgressBar(iconSize*1.2, DataBarHeight, colorSetting, pct, 1.0)
+        end
     end
-    local ench = core.magic.enchantments.records[rec.enchant]
-    if not ench then return end
-    local pct = (itemData and math.floor(itemData.enchantmentCharge) or 0) / ench.charge
-    local bar = fns.createSmallProgressBar(iconSize*1.2, DataBarHeight, colorSetting, pct, 1.0)
+
     barRoot.layout.content = ui.content{bar}
     barRoot:update()
 end
 
+-- Subscribe to color setting
+userInterfaceSettings:subscribe(async:callback(function(section, key)
+    if key then
+        if key == "colorSetting" then
+            colorSetting = userInterfaceSettings:get(key)
+            updateChargeBar()
+        elseif key == "betterBarSetting" then
+            betterBar = userInterfaceSettings:get(key)
+            if betterBar then
+                defaults.xPos = 12
+            else
+                defaults.xPos = 82
+            end
+            setPosVars()
+            barRoot.layout.props.position = v2(xPos or defaults.xPos, yPos or defaults.yPos)
+            updateChargeBar()
+        elseif key == "alwaysOn" then
+            persist = userInterfaceSettings:get(key)
+            updateChargeBar()
+        end
+    else
+        --do nothing..
+    end
+end))
+positionSettings:subscribe(async:callback(function(section, key)
+    if key then
+        if key == "HUD_LOCK" then
+            HUD_LOCK = positionSettings:get(key)
+            if HUD_LOCK then
+                barRoot.layout.layer = "HUD"
+            else
+                barRoot.layout.layer = "Modal"
+            end
+            updateChargeBar()
+
+        elseif key == "R_FLAG" then
+            print('RESETTING INSIDE THE PLAYER SCRIPT>>>>>')
+            setPosVars()
+            saveData.xPos = xPos
+            saveData.yPos = yPos
+            barRoot.layout.props.position = v2(defaults.xPos, defaults.yPos)
+            updateChargeBar()
+        else
+            --do nothing..
+        end
+    end
+end))
+
+-- oneShot flag for immediate update when HUD becomes visible
+local oneShot = true
+
+local function onUpdate(dt)
+    if I.UI.isHudVisible() then
+        -- 1st update immediately when HUD becomes visible
+        if oneShot then
+            updateChargeBar()
+            oneShot = false
+        end
+        accumulator = accumulator + dt
+        if accumulator >= UPDATE_INTERVAL then
+            accumulator = 0
+            updateChargeBar()
+        end
+    else
+        accumulator = 0
+        oneShot = true -- reset oneShot for when HUD becomes visible again
+        barRoot.layout.content = ui.content({})
+        barRoot:update()
+    end
+end
+
+local function onSave()
+    -- returns saved data..
+    return saveData
+end
+
 return {
     engineHandlers = {
-        onUpdate = function(dt)
-            accumulator = accumulator + dt
-            if accumulator >= UPDATE_INTERVAL then
-                accumulator = 0
-                fns.updateChargeBar()
-            end
-        end,
+        onUpdate = onUpdate,
         onLoad = function(data)
-            fns.updateChargeBar()
+            saveData = data or nil
+            if saveData then
+                xPos = saveData.xPos
+                yPos = saveData.yPos
+            end
+            updateChargeBar()
         end,
+        onSave = onSave,
     }
 }
