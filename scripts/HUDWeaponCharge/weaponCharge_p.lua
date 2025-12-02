@@ -13,11 +13,12 @@ local saveData = {}
 
 -- Load user settings
 local userInterfaceSettings = storage.playerSection("SettingsPlayer" .. modInfo.name)
-local positionSettings = storage.playerSection("SettingsPlayer" .. modInfo.name .. "Position")
-local colorSetting = userInterfaceSettings:get("colorSetting")
+--local positionSettings = storage.playerSection("SettingsPlayer" .. modInfo.name .. "Position")
+local colorMenu = storage.playerSection("SettingsPlayer" .. modInfo.name .. "Color")
+local colorSetting = colorMenu:get("colorSetting")
 local betterBar = userInterfaceSettings:get("betterBarSetting")
 local persist = userInterfaceSettings:get("alwaysOn")
-local HUD_LOCK = positionSettings:get("HUD_LOCK")
+local HUD_LOCK = userInterfaceSettings:get("HUD_LOCK")
 
 
 -- Local variables & Defaults
@@ -31,8 +32,8 @@ local defaults = {xPos = 82, yPos = displayAreaY-12}
 local DataBarHeight = 7
 local UPDATE_INTERVAL = 0.15        -- update every 1 seconds
 
-local xPos = (positionSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(positionSettings:get("xPos"))
-local yPos = (positionSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(positionSettings:get("yPos"))
+local xPos = (userInterfaceSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(userInterfaceSettings:get("xPos"))
+local yPos = (userInterfaceSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(userInterfaceSettings:get("yPos"))
 -- Adjust for Better Bar mod
 if betterBar then
     defaults.xPos = 12
@@ -40,13 +41,13 @@ if betterBar then
 end
 
 local function setCoord(v2)
-    positionSettings:set("xPos",math.floor(v2.x))
-    positionSettings:set("yPos",math.floor(v2.y))
+    userInterfaceSettings:set("xPos",math.floor(v2.x))
+    userInterfaceSettings:set("yPos",math.floor(v2.y))
 end
 
 local function setPosVars()
-    xPos = (positionSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(positionSettings:get("xPos"))
-    yPos = (positionSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(positionSettings:get("yPos"))
+    xPos = (userInterfaceSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(userInterfaceSettings:get("xPos"))
+    yPos = (userInterfaceSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(userInterfaceSettings:get("yPos"))
 end
 
 -- Getter for current right slot
@@ -183,13 +184,21 @@ local function updateChargeBar()
     barRoot:update()
 end
 
+colorMenu:subscribe(async:callback(function(section, key)
+    if key then
+        if key == "colorSetting" then
+            print("color setting changed..")
+            colorSetting = colorMenu:get(key)
+            print(colorSetting)
+            updateChargeBar()
+        end
+    end
+end))
+
 -- Subscribe to color setting
 userInterfaceSettings:subscribe(async:callback(function(section, key)
     if key then
-        if key == "colorSetting" then
-            colorSetting = userInterfaceSettings:get(key)
-            updateChargeBar()
-        elseif key == "betterBarSetting" then
+        if key == "betterBarSetting" then
             betterBar = userInterfaceSettings:get(key)
             if betterBar then
                 defaults.xPos = 12
@@ -197,27 +206,23 @@ userInterfaceSettings:subscribe(async:callback(function(section, key)
                 defaults.xPos = 82
             end
             setPosVars()
-            barRoot.layout.props.position = v2(xPos or defaults.xPos, yPos or defaults.yPos)
+            barRoot.layout.props.position = v2(defaults.xPos,defaults.yPos)
+            saveData.xPos = xPos
+            saveData.yPos = yPos
             updateChargeBar()
         elseif key == "alwaysOn" then
             persist = userInterfaceSettings:get(key)
             updateChargeBar()
-        end
-    else
-        --do nothing..
-    end
-end))
-positionSettings:subscribe(async:callback(function(section, key)
-    if key then
-        if key == "HUD_LOCK" then
-            HUD_LOCK = positionSettings:get(key)
+        elseif key == "HUD_LOCK" then
+            HUD_LOCK = userInterfaceSettings:get(key)
             if HUD_LOCK then
                 barRoot.layout.layer = "HUD"
+                saveData.layer = "HUD"
             else
                 barRoot.layout.layer = "Modal"
+                saveData.layer = "Modal"
             end
             updateChargeBar()
-
         elseif key == "R_FLAG" then
             print('RESETTING INSIDE THE PLAYER SCRIPT>>>>>')
             setPosVars()
@@ -225,11 +230,10 @@ positionSettings:subscribe(async:callback(function(section, key)
             saveData.yPos = yPos
             barRoot.layout.props.position = v2(defaults.xPos, defaults.yPos)
             updateChargeBar()
-        else
-            --do nothing..
         end
     end
 end))
+
 
 -- oneShot flag for immediate update when HUD becomes visible
 local oneShot = true
