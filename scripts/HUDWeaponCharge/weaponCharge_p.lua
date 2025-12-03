@@ -8,19 +8,18 @@ local I       = require("openmw.interfaces")
 local modInfo = require("Scripts.HUDweaponCharge.modInfo")
 local storage = require("openmw.storage")
 local async   = require('openmw.async')
-local v2 = util.vector2
 local saveData = {}
 
 -- Load user settings
 local userInterfaceSettings = storage.playerSection("SettingsPlayer" .. modInfo.name)
---local positionSettings = storage.playerSection("SettingsPlayer" .. modInfo.name .. "Position")
 local colorMenu = storage.playerSection("SettingsPlayer" .. modInfo.name .. "Color")
 local colorSetting = colorMenu:get("colorSetting")
+local enable = userInterfaceSettings:get("modEnable")
 local betterBar = userInterfaceSettings:get("betterBarSetting")
 local persist = userInterfaceSettings:get("alwaysOn")
 local HUD_LOCK = userInterfaceSettings:get("HUD_LOCK")
-
-
+local xSett = userInterfaceSettings:get("xPos")
+local ySett = userInterfaceSettings:get("yPos")
 -- Local variables & Defaults
 local v2 = util.vector2
 local Actor = types.Actor
@@ -32,24 +31,18 @@ local defaults = {xPos = 82, yPos = displayAreaY-12}
 local DataBarHeight = 7
 local UPDATE_INTERVAL = 0.15        -- update every 1 seconds
 
-local xPos = (userInterfaceSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(userInterfaceSettings:get("xPos"))
-local yPos = (userInterfaceSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(userInterfaceSettings:get("yPos"))
--- Adjust for Better Bar mod
-if betterBar then
-    defaults.xPos = 12
-    yPos = 12
-end
+saveData.x = xSett or (betterBar and 12 or 82)
+saveData.y = ySett or (displayAreaY - 12)
 
 local function setCoord(v2)
     userInterfaceSettings:set("xPos",math.floor(v2.x))
     userInterfaceSettings:set("yPos",math.floor(v2.y))
 end
 
-local function setPosVars()
-    xPos = (userInterfaceSettings:get("xPos") == '' and (betterBar and 12 or 82)) or tonumber(userInterfaceSettings:get("xPos"))
-    yPos = (userInterfaceSettings:get("yPos") == '' and (displayAreaY - 12)) or tonumber(userInterfaceSettings:get("yPos"))
+local function saveGameData(vector2)
+    saveData.x = vector2.x
+    saveData.y = vector2.y
 end
-
 -- Getter for current right slot
 local function getCurrentWeapon() return Actor.equipment(self)[SLOT_CARRIED_RIGHT] end
 -- Small Progress Bar Creator
@@ -100,16 +93,13 @@ local function setupMouseEvents(element)
             if HUD_LOCK then return end
             layout.userData.doDrag = true
             layout.userData.lastMousePos = coord.position
-            print(xPos, yPos)
-            
         end),
         mouseRelease = async:callback(function(_, layout)
             if HUD_LOCK then return end
             local props = layout.props
             layout.userData.doDrag = false
-            setCoord(props.position)
-            saveData.xPos = props.position.x
-            saveData.yPos = props.position.y
+            setCoord(props.position) --Setter for UI storage sections
+            saveGameData(props.position) --Save func for data.
         end),
         mouseMove = async:callback(function(coord, layout)
             if HUD_LOCK then return end
@@ -128,8 +118,7 @@ local barRoot = ui.create {
     name  = "ChargeBarHUD",
     props = {
         anchor = v2(0, 0),
-        --relativePosition = v2(0.0647, 0.984),
-        position = v2(xPos or defaults.xPos, yPos or defaults.yPos),      -- adjust horizontal centering if needed
+        position = v2(saveData.x or defaults.xPos, saveData.y or defaults.yPos),
         size = v2(iconSize*1.2, DataBarHeight),
     },
     content = ui.content {},
@@ -160,11 +149,6 @@ local function updateChargeBar()
         barRoot:update()
         return
     end
-    -- if not rec or not rec.enchant then
-    --     barRoot.layout.content = ui.content({})
-    --     barRoot:update()
-    --     return
-    -- end
     local ench = rec and rec.enchant and core.magic.enchantments.records[rec.enchant]
     local pct, bar -- initialized as nil, if applies is false, then content in bar(content) is nil
     if not ench and persist then
@@ -205,10 +189,10 @@ userInterfaceSettings:subscribe(async:callback(function(section, key)
             else
                 defaults.xPos = 82
             end
-            setPosVars()
-            barRoot.layout.props.position = v2(defaults.xPos,defaults.yPos)
-            saveData.xPos = xPos
-            saveData.yPos = yPos
+            local vec = v2(defaults.xPos,defaults.yPos)
+            barRoot.layout.props.position = vec
+            saveGameData(vec)
+            self:sendEvent("settingMenuUpdate", vec) --send event to update the UI position boxes
             updateChargeBar()
         elseif key == "alwaysOn" then
             persist = userInterfaceSettings:get(key)
@@ -224,21 +208,22 @@ userInterfaceSettings:subscribe(async:callback(function(section, key)
             end
             updateChargeBar()
         elseif key == "R_FLAG" then
-            print('RESETTING INSIDE THE PLAYER SCRIPT>>>>>')
-            setPosVars()
-            saveData.xPos = xPos
-            saveData.yPos = yPos
-            barRoot.layout.props.position = v2(defaults.xPos, defaults.yPos)
+            --print('RESETTING INSIDE THE PLAYER SCRIPT>>>>>') --for Debugging
+            local defaultVec = v2(defaults.xPos, defaults.yPos)
+            barRoot.layout.props.position = defaultVec
+            saveGameData(defaultVec)
             updateChargeBar()
+        elseif key == "modEnable" then
+            enable = userInterfaceSettings:get(key)
         end
     end
 end))
-
 
 -- oneShot flag for immediate update when HUD becomes visible
 local oneShot = true
 
 local function onUpdate(dt)
+    if not enable then return end
     if I.UI.isHudVisible() then
         -- 1st update immediately when HUD becomes visible
         if oneShot then
@@ -260,20 +245,29 @@ end
 
 local function onSave()
     -- returns saved data..
+    if not enable then return end
     return saveData
+end
+
+local function settingMenuUpdate(data)
+    setCoord(data)
 end
 
 return {
     engineHandlers = {
         onUpdate = onUpdate,
         onLoad = function(data)
-            saveData = data or nil
+            if not enable then return end
+            -- saveData = data or nil
             if saveData then
-                xPos = saveData.xPos
-                yPos = saveData.yPos
+                saveData.xPos = data and data.xPos
+                saveData.xPos = data and data.yPos
             end
             updateChargeBar()
         end,
         onSave = onSave,
-    }
+    },
+    eventHandlers = {
+        settingMenuUpdate = settingMenuUpdate,
+    },
 }

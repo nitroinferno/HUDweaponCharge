@@ -48,7 +48,7 @@ I.Settings.registerGroup {
 	settings = {
 		setting("modEnable", "checkbox", {}, "Enable Mod", modEnableDescription, true),
 		setting("betterBarSetting", "checkbox", {}, "Better Bar Compatibility", "Enable if using BetterBars mod", betterBar),
-		setting("alwaysOn", "checkbox", {}, "Bar is always shown", "Bar always displaye regardless if item has enchantment or constant effect", false),
+		setting("alwaysOn", "checkbox", {}, "Bar is always shown", "Bar always displaye regardless if item has enchantment or constant effect", true),
 		setting("HUD_LOCK", "checkbox", {disabled = false}, "Lock Position", nil, true),
 		setting("xPos", "number", {integer = true, disabled = true}, "X Position", nil, defaults.xPos),
 		setting("yPos", "number", {integer = true, disabled = true}, "Y Position", nil, defaults.yPos),
