@@ -8,6 +8,7 @@ openMW 0.49 or later.
 In vanilla Morrowind there is a fillbar under the currently equipped enchanted item's icon showing how much charge is left on it. This mod adds a similar bar under the equipped enchanted weapon's icon, so that you can quickly see the charge left on it.
 
 Settings Page allows fully configurable color. Includes built-in color picker. 
+Enchanting bar can be unlocked and click & dragged to anywhere on the screen.
 
 ## Installation instructions
 
