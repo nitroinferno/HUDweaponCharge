@@ -219,9 +219,6 @@ userInterfaceSettings:subscribe(async:callback(function(section, key)
     end
 end))
 
-local function chargenDone()
-	return types.Player.isCharGenFinished(self)
-end
 -- oneShot flag for immediate update when HUD becomes visible
 local oneShot = true
 
