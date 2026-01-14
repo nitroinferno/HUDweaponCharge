@@ -28,7 +28,7 @@ local SLOT_CARRIED_RIGHT = Actor.EQUIPMENT_SLOT.CarriedRight
 local iconSize = 30
 local displayAreaY = ui.layers[1].size.y
 local defaults = {xPos = 82, yPos = displayAreaY-12}
-local DataBarHeight = 7
+local DataBarHeight = 6
 local UPDATE_INTERVAL = 0.15        -- update every 1 seconds
 
 saveData.x = xSett or (betterBar and 12 or 82)
@@ -219,11 +219,15 @@ userInterfaceSettings:subscribe(async:callback(function(section, key)
     end
 end))
 
+local function chargenDone()
+	return types.Player.isCharGenFinished(self)
+end
 -- oneShot flag for immediate update when HUD becomes visible
 local oneShot = true
 
 local function onUpdate(dt)
     if not enable then return end
+    if not types.Player.isCharGenFinished(self) then return end
     if I.UI.isHudVisible() then
         -- 1st update immediately when HUD becomes visible
         if oneShot then
