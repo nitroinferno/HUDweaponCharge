@@ -221,26 +221,54 @@ end))
 
 -- oneShot flag for immediate update when HUD becomes visible
 local oneShot = true
+local charGenFlag = false
+local function resetClear()
+    barRoot.layout.content = ui.content({})
+    barRoot:update()
+end
+
+--Credit to hyacinth from Timehud
+local function chargenFinished()
+	if saveData.chargenFinished then
+		return true
+	end
+	if types.Player.isCharGenFinished(self) then
+		saveData.chargenFinished = true
+		return true
+	end
+	local playerItems = types.Container.inventory(self):getAll()
+	for a,b in pairs(playerItems) do
+		if b.recordId == "chargen statssheet" then
+			saveData.chargenFinished = true
+			return true
+		end
+	end
+	return false
+end
 
 local function onUpdate(dt)
     if not enable then return end
-    if not types.Player.isCharGenFinished(self) then return end
-    if I.UI.isHudVisible() then
-        -- 1st update immediately when HUD becomes visible
-        if oneShot then
-            updateChargeBar()
-            oneShot = false
-        end
-        accumulator = accumulator + dt
-        if accumulator >= UPDATE_INTERVAL then
+    if chargenFinished() then
+        charGenFlag = false
+        if I.UI.isHudVisible() then
+            -- 1st update immediately when HUD becomes visible
+            if oneShot then
+                updateChargeBar()
+                oneShot = false
+            end
+            accumulator = accumulator + dt
+            if accumulator >= UPDATE_INTERVAL then
+                accumulator = 0
+                updateChargeBar()
+            end
+        else
             accumulator = 0
-            updateChargeBar()
+            oneShot = true -- reset oneShot for when HUD becomes visible again
+            resetClear()
         end
-    else
-        accumulator = 0
-        oneShot = true -- reset oneShot for when HUD becomes visible again
-        barRoot.layout.content = ui.content({})
-        barRoot:update()
+    elseif charGenFlag == false then
+        charGenFlag = true -- reset oneShot for when HUD becomes visible again
+        resetClear()
     end
 end
 
