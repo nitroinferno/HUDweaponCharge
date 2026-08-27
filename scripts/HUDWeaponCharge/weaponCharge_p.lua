@@ -51,7 +51,7 @@ local function createSmallProgressBar(width, height, color, percent, opacity)
     return {
         template = I.MWUI.templates.boxSolid,
         type     = ui.TYPE.Container,
-        props    = { inheritAlpha = false, color = util.color.rgba(0, 0, 0, 0), alpha = opacity or 1.0 },
+        props    = { inheritAlpha = false, alpha = opacity or 1.0 },
         content  = ui.content({
             {
                 type  = ui.TYPE.Image,
@@ -287,10 +287,10 @@ return {
         onUpdate = onUpdate,
         onLoad = function(data)
             if not enable then return end
-            -- saveData = data or nil
+            saveData = data or {}
             if saveData then
                 saveData.xPos = data and data.xPos
-                saveData.xPos = data and data.yPos
+                saveData.yPos = data and data.yPos
             end
             updateChargeBar()
         end,
